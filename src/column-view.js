@@ -21,18 +21,12 @@ var ColumnView = (function() {
   
   function getTransformPrefix() {
     var el = document.createElement("_")
-    var keys = Object.keys(el.style);
     var prefixes = ["transform", "webkitTransform", "MozTransform", "msTransform", "OTransform"];
-    var index, prefix;
-    prefixes.forEach(function(_prefix) {
-      index = keys.indexOf(_prefix);
-      if (index >= 0) {
-        prefix = _prefix;
-        return false; // break
-      };
-    });
-    if (prefix) { return prefix; }
-    else { throw new Error("transform not supported"); }
+    var prefix;
+    while (prefix = prefixes.shift()) {
+      if (prefix in el.style) return prefix;
+    }
+    throw new Error("transform not supported");
   }
 
   function uid() {
