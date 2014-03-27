@@ -109,16 +109,15 @@ ColumnView.prototype.CustomSelect = (function() {
     },
 
     _scrollIntoView: function scrollIntoView() {
-      var itemRect = this._selectedEl.getBoundingClientRect();
       var elRect = this.el.getBoundingClientRect();
-      var relativeToBottom = elRect.height - itemRect.bottom;
-
-      if (relativeToBottom < 0) {
-        this._selectedEl.scrollIntoView(false);
+      var itemRect = this._selectedEl.getBoundingClientRect();
+      
+      if (itemRect.bottom > elRect.bottom) {
+        this.el.scrollTop += itemRect.bottom - elRect.bottom;
       }
 
-      if (itemRect.top < 0) {
-        this._selectedEl.scrollIntoView(true);
+      if (itemRect.top < elRect.top) {
+        this.el.scrollTop -= elRect.top - itemRect.top;
       }
     },
 
