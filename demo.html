@@ -3,8 +3,7 @@
 <head>
   <title>ColumnView Demo</title>
   <meta charset="utf-8"> 
-  <script type="text/javascript" src="src/column-view.js"></script>
-  <script type="text/javascript" src="src/custom-select.js"></script>
+  <script type="text/javascript" src="dist/all.js"></script>
   <script type="text/javascript" src="demo-data.js"></script>
   <link rel="stylesheet" type="text/css" href="src/column-view.css">
   <link rel="stylesheet" type="text/css" href="demo.css">
@@ -69,7 +68,7 @@
         source: source,
         path: [data.rootID],
         onChange: function() {
-          backBtn.disabled = !this.canMoveBack;
+          backBtn.disabled = !this.canMoveBack();
         }
       }
     );
