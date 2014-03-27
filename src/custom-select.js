@@ -1,21 +1,19 @@
 
 function htmlToDocumentFragment(html) {
+  "use strict";
   var frag = document.createDocumentFragment();
-  var tmp = document.createElement('body');
+  var tmp = document.createElement("body");
   tmp.innerHTML = html;
   var child;
   while (child = tmp.firstChild) {
     frag.appendChild(child);
-  };
+  }
   return frag;
 }
 
-var CustomSelect = (function() {
+ColumnView.prototype.CustomSelect = (function() {
   "use strict";
 
-  function itemTemplate(url, value, name) { return '<div class="item" data-value="'+value+'" role="treeitem">'+name+'</div>'; };
-  function groupTemplate(title) { return '<div class="divider">'+title+'</div>'; };
-  
   var indexOf = Array.prototype.indexOf;
 
   // aria-owns="catGroup" aria-expanded="false"
@@ -52,6 +50,7 @@ var CustomSelect = (function() {
   CustomSelect.prototype = {
 
     _monkeyPatchEl: function monkeyPatchEl() {
+      var that = this;
       var selectIndex = this.selectIndex.bind(this);
       var movePosition = this.movePosition.bind(this);
       var deselect = this.deselect.bind(this);
@@ -60,12 +59,10 @@ var CustomSelect = (function() {
         selectIndex: selectIndex,
         movePosition: movePosition,
         deselect: deselect,
-        selectValue: selectValue
+        selectValue: selectValue,
+        value : function value() { return that.value; }
       };
-      Object.defineProperty(this.el, "customSelect", {
-        configurable: true,
-        get: function() { return elMethods; }
-      });
+      this.el.customSelect = elMethods;
     },
 
     _render: function render(selectedValue) {
@@ -88,8 +85,9 @@ var CustomSelect = (function() {
     },
 
     _renderItems: function renderItems(container, models) {
+      var that = this;
       models.forEach(function(model) {
-        var html = itemTemplate(model.url, model.value, model.name);
+        var html = that.itemTemplate(model);
         var item = htmlToDocumentFragment(html);
         container.appendChild(item);
       });
@@ -98,7 +96,7 @@ var CustomSelect = (function() {
     _renderGroups: function renderGroups(container, groups) {
       var that = this;
       groups.forEach(function(group) {
-        var html = groupTemplate(group.title);
+        var html = that.groupTemplate(group);
         var item = htmlToDocumentFragment(html);
         container.appendChild(item);
         that._renderItems(container, group.items);
@@ -137,7 +135,7 @@ var CustomSelect = (function() {
       this._selectedEl = el;
       var oldValue = this.value;
       this.value = el.dataset.value;
-      this.changeCB(this, this.value, oldValue)
+      this.changeCB(this, this.value, oldValue);
     },
 
     _onClick: function onClick(e) {
@@ -177,6 +175,14 @@ var CustomSelect = (function() {
     selectValue: function selectValue(value) {
       var el = this.el.querySelector("[data-value='"+value+"']");
       this._select(el);
+    },
+
+    itemTemplate: function itemTemplate(data) {
+      return '<div class="item" data-value="'+data.value+'" role="treeitem">'+data.name+'</div>';
+    },
+    
+    groupTemplate: function groupTemplate(data) {
+      return '<div class="divider">'+data.title+'</div>';
     }
 
   };
@@ -186,15 +192,20 @@ var CustomSelect = (function() {
 })();
 
 
-function Preview(parent, el) {
-  this.el = parent;
-  this.el.appendChild(el);
-  this.el.classList.add("html");
-}
+ColumnView.prototype.Preview = (function() {
+  "use strict";
 
-Preview.prototype = {
-  remove: function remove() {
-    this.el.remove();
+  function Preview(parent, el) {
+    this.el = parent;
+    this.el.appendChild(el);
+    this.el.classList.add("html");
   }
-}
+
+  Preview.prototype = {
+    remove: function remove() {
+      this.el.remove();
+    }
+  };
+  return Preview;
+})();
 

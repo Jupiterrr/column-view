@@ -20,7 +20,7 @@ var ColumnView = (function() {
   transformPrefix = getTransformPrefix();
   
   function getTransformPrefix() {
-    var el = document.createElement("_")
+    var el = document.createElement("_");
     var prefixes = ["transform", "webkitTransform", "MozTransform", "msTransform", "OTransform"];
     var prefix;
     while (prefix = prefixes.shift()) {
@@ -34,7 +34,7 @@ var ColumnView = (function() {
   }
 
   function ColumnView(el, options) {
-    var that = this, onKeydown, onChange, onResize, onKeyup;
+    var that = this, onKeydown, onKeyup;
 
     this.options = options || {};
     this.value = null;
@@ -53,7 +53,7 @@ var ColumnView = (function() {
     this.callbacks = {
       change: that.options.onChange,
       source: that.options.source
-    }
+    };
 
     if (this.mobileLayout) {
       this.colCount = 1;
@@ -88,17 +88,20 @@ var ColumnView = (function() {
 
   ColumnView.prototype = {
 
-    get columns() {
+    // Getter
+    // --------
+
+    columns: function columns() {
       return _slice.call( this.carriage.children );
     },
 
-    get focusedColumn() {
-      var cols = this.columns;
+    focusedColumn: function focusedColumn() {
+      var cols = this.columns();
       return cols[cols.length-2] || cols[0];
     },
 
-    get canMoveBack() { 
-      return this.columns.length > 2 
+    canMoveBack: function canMoveBack() {
+      return this.columns().length > 2;
     },
 
 
@@ -106,7 +109,6 @@ var ColumnView = (function() {
     // --------
 
     _onKeydown: function onKeydown(e) {
-      var movingUpOrDown = this.movingUpOrDown;
       this.movingUpOrDown = false;
       if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey)
         return; // do nothing
@@ -115,23 +117,23 @@ var ColumnView = (function() {
         case keyCodes.left:
         case keyCodes.backspace:
           this._keyLeft();
-          e.preventDefault()
+          e.preventDefault();
           break;
         case keyCodes.right:
         case keyCodes.space:
         case keyCodes.enter:
           this._keyRight();
-          e.preventDefault()
+          e.preventDefault();
           break;
         case keyCodes.up:
           this.movingUpOrDown = true;
           this._moveCursor(-1);
-          e.preventDefault()
+          e.preventDefault();
           break;
         case keyCodes.down:
           this.movingUpOrDown = true;
           this._moveCursor(1);
-          e.preventDefault()
+          e.preventDefault();
           break;
         default:
           return;
@@ -143,7 +145,7 @@ var ColumnView = (function() {
       if (this.fastMoveChangeFn) this.fastMoveChangeFn();
     },
 
-    _keyLeft: function keyLeft() { this.back() },
+    _keyLeft: function keyLeft() { this.back(); },
 
     _keyRight: function keyRight() {
       var col = this.carriage.lastChild;
@@ -152,7 +154,7 @@ var ColumnView = (function() {
     },
 
     _moveCursor: function moveCursor(direction) {
-      var col = this.focusedColumn;
+      var col = this.focusedColumn();
       col.customSelect.movePosition(direction);
     },
 
@@ -163,19 +165,19 @@ var ColumnView = (function() {
       if (!this.ready) return;
 
       if (this.movingUpOrDown) {
-        this.fastMoveChangeFn = function() { that._onColumnChange(columnClass, value, oldValue); }
+        this.fastMoveChangeFn = function() { that._onColumnChange(columnClass, value, oldValue); };
         return;
-      };
+      }
+
       this.fastMoveChangeFn = null;
       // console.log("cv change", value)
 
       this.value = value;
 
-      if (this._activeCol == column && this.columns.indexOf(column) != 0) {
+      if (this.focusedColumn() == column && this.columns().indexOf(column) !== 0) {
         this.lastColEl = this.carriage.lastChild;
       } else {
         this._removeAfter(column);
-        this._activeCol = column;
         this.lastColEl = null;
       }
       // console.log("horizontal change", this._activeCol == column)
@@ -183,7 +185,7 @@ var ColumnView = (function() {
       function appendIfValueIsSame(data) {
         if (that.value !== value) return;
         that._appendCol(data);
-        that.callbacks.change.call(that, value, data);
+        that.callbacks.change.call(that, value);
       }
 
       this.callbacks.source(value, appendIfValueIsSame);
@@ -196,8 +198,8 @@ var ColumnView = (function() {
     _initialize: function initialize() {
       var that = this;
       var path = this.path || [];
-      var pathPairs = path.map(function(value, index, array) { 
-        return [value, array[index+1]]; 
+      var pathPairs = path.map(function(value, index, array) {
+        return [value, array[index+1]];
       });
       this.carriage.innerHTML = "";
 
@@ -214,7 +216,7 @@ var ColumnView = (function() {
       function proccessPath() {
         var pathPair = pathPairs.shift();
         if (pathPair)
-          proccessPathPair(pathPair, proccessPath)
+          proccessPathPair(pathPair, proccessPath);
         else
           ready();
       }
@@ -255,15 +257,13 @@ var ColumnView = (function() {
     _newColInstance: function newColInstance(data, col) {
       var colInst;
       if (data.dom) {
-        colInst = new Preview(col, data.dom);
-        Object.defineProperty(col, "customSelect", {
-          configurable: true,
-          value: undefined
-        });
+        colInst = new this.Preview(col, data.dom);
+        // reset monkeypatched properties for reused col elements
+        col.customSelect = null; 
       }
       else if (data.items || data.groups) {
         data.onChange = this._onColumnChangeBound;
-        colInst = new CustomSelect(col, data);
+        colInst = new this.CustomSelect(col, data);
       }
       else {
         throw "Type error";
@@ -272,13 +272,13 @@ var ColumnView = (function() {
     },
 
     _removeAfter: function removeAfter(col) {
-      var cols = this.columns;
+      var cols = this.columns();
       var toRemove = cols.splice(cols.indexOf(col)+1, cols.length);
       toRemove.forEach(function(col) { col.remove(); });
     },
 
     _alignCols: function alignCols() {
-      var length = this.columns.length;
+      var length = this.columns().length;
       if (this.lastAllignment === length)
         return; // skip if nothing has changed
 
@@ -304,15 +304,15 @@ var ColumnView = (function() {
     // ### public
 
     back: function back() {
-      if (!this.canMoveBack) return;
-      var lastCol = this.focusedColumn;
+      if (!this.canMoveBack()) return;
+      var lastCol = this.focusedColumn();
       this._removeAfter(lastCol);
       // triggers no change
-      lastCol.customSelect.deselect() // COL ACTION!!!!!!
+      lastCol.customSelect.deselect(); // COL ACTION!!!!!!
 
-      this._activeCol = this.focusedColumn;
       this._alignCols();
-      this.callbacks.change(this._activeCol.dataset.selected);
+      this.value = this.focusedColumn().customSelect.value();
+      this.callbacks.change.call(this, this.value);
     }
 
 
