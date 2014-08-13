@@ -7,10 +7,15 @@
   background: white;
 }
 
+.column-view.mobile {
+  height: auto;
+}
+
 .column-view .carriage {
   position: relative;
   height: 100%;
   width: 10000px;
+  white-space: nowrap;
 }
 
 .column-view .carriage.transition {
@@ -19,17 +24,15 @@
 
 .column-view .column {
   position: relative;
+  display: inline-block;
   height: 100%;
   box-sizing: border-box;
   overflow-y: auto;
-  float: left;
+  white-space: normal;
   transition: background-color linear .1s;
-}
-
-.column-view .column {
   border-right: 1px solid #E2E2E2;
-  background-color: #F9F9F9;
   word-break: break-word;
+  vertical-align: top;
 }
 
 .column-view .column:last-child {
@@ -48,6 +51,7 @@
 .column-view .item {
   display: block;
   padding: 3px;
+  white-space: normal;
 }
 
 .column-view .item:hover {
@@ -58,5 +62,4 @@
   color: #ffffff;
   background-color: #0069D6;
 }
-
 

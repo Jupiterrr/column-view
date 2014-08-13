@@ -5,6 +5,11 @@
   font-family: "Arial";
 }
 
+#column-view.mobile {
+  height: auto;
+  width: auto;
+}
+
 #column-view .item {
   padding: 4px 4px;
   border: 0;
@@ -22,6 +27,16 @@
 
 #column-view .item {
   line-height: 1.1em;
+}
+
+#column-view.mobile .item {
+  padding: .5em 8px;
+  font-size: 1.5em;
+  border-bottom: 1px solid #eee;
+}
+
+#column-view.mobile .item:last-child {
+  border-bottom: 0;
 }
 
 #column-view .event {

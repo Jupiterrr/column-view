@@ -1,3 +1,215 @@
+/*
+ * classList.js: Cross-browser full element.classList implementation.
+ * 2012-11-15
+ *
+ * By Eli Grey, http://eligrey.com
+ * Public Domain.
+ * NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
+ */
+
+/*global self, document, DOMException */
+
+/*! @source http://purl.eligrey.com/github/classList.js/blob/master/classList.js*/
+
+if (typeof document !== "undefined" && !("classList" in document.documentElement)) {
+
+(function (view) {
+
+"use strict";
+
+if (!('HTMLElement' in view) && !('Element' in view)) return;
+
+var
+    classListProp = "classList"
+  , protoProp = "prototype"
+  , elemCtrProto = (view.HTMLElement || view.Element)[protoProp]
+  , objCtr = Object
+  , strTrim = String[protoProp].trim || function () {
+    return this.replace(/^\s+|\s+$/g, "");
+  }
+  , arrIndexOf = Array[protoProp].indexOf || function (item) {
+    var
+        i = 0
+      , len = this.length
+    ;
+    for (; i < len; i++) {
+      if (i in this && this[i] === item) {
+        return i;
+      }
+    }
+    return -1;
+  }
+  // Vendors: please allow content code to instantiate DOMExceptions
+  , DOMEx = function (type, message) {
+    this.name = type;
+    this.code = DOMException[type];
+    this.message = message;
+  }
+  , checkTokenAndGetIndex = function (classList, token) {
+    if (token === "") {
+      throw new DOMEx(
+          "SYNTAX_ERR"
+        , "An invalid or illegal string was specified"
+      );
+    }
+    if (/\s/.test(token)) {
+      throw new DOMEx(
+          "INVALID_CHARACTER_ERR"
+        , "String contains an invalid character"
+      );
+    }
+    return arrIndexOf.call(classList, token);
+  }
+  , ClassList = function (elem) {
+    var
+        trimmedClasses = strTrim.call(elem.className)
+      , classes = trimmedClasses ? trimmedClasses.split(/\s+/) : []
+      , i = 0
+      , len = classes.length
+    ;
+    for (; i < len; i++) {
+      this.push(classes[i]);
+    }
+    this._updateClassName = function () {
+      elem.className = this.toString();
+    };
+  }
+  , classListProto = ClassList[protoProp] = []
+  , classListGetter = function () {
+    return new ClassList(this);
+  }
+;
+// Most DOMException implementations don't allow calling DOMException's toString()
+// on non-DOMExceptions. Error's toString() is sufficient here.
+DOMEx[protoProp] = Error[protoProp];
+classListProto.item = function (i) {
+  return this[i] || null;
+};
+classListProto.contains = function (token) {
+  token += "";
+  return checkTokenAndGetIndex(this, token) !== -1;
+};
+classListProto.add = function () {
+  var
+      tokens = arguments
+    , i = 0
+    , l = tokens.length
+    , token
+    , updated = false
+  ;
+  do {
+    token = tokens[i] + "";
+    if (checkTokenAndGetIndex(this, token) === -1) {
+      this.push(token);
+      updated = true;
+    }
+  }
+  while (++i < l);
+
+  if (updated) {
+    this._updateClassName();
+  }
+};
+classListProto.remove = function () {
+  var
+      tokens = arguments
+    , i = 0
+    , l = tokens.length
+    , token
+    , updated = false
+  ;
+  do {
+    token = tokens[i] + "";
+    var index = checkTokenAndGetIndex(this, token);
+    if (index !== -1) {
+      this.splice(index, 1);
+      updated = true;
+    }
+  }
+  while (++i < l);
+
+  if (updated) {
+    this._updateClassName();
+  }
+};
+classListProto.toggle = function (token, forse) {
+  token += "";
+
+  var
+      result = this.contains(token)
+    , method = result ?
+      forse !== true && "remove"
+    :
+      forse !== false && "add"
+  ;
+
+  if (method) {
+    this[method](token);
+  }
+
+  return !result;
+};
+classListProto.toString = function () {
+  return this.join(" ");
+};
+
+if (objCtr.defineProperty) {
+  var classListPropDesc = {
+      get: classListGetter
+    , enumerable: true
+    , configurable: true
+  };
+  try {
+    objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
+  } catch (ex) { // IE 8 doesn't support enumerable:true
+    if (ex.number === -0x7FF5EC54) {
+      classListPropDesc.enumerable = false;
+      objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
+    }
+  }
+} else if (objCtr[protoProp].__defineGetter__) {
+  elemCtrProto.__defineGetter__(classListProp, classListGetter);
+}
+
+}(self));
+
+}
+
+function debounce(func, wait, immediate) {
+  var timeout, args, context, timestamp, result;
+
+  function now() { new Date().getTime(); }
+
+  var later = function() {
+    var last = now() - timestamp;
+    if (last < wait) {
+      timeout = setTimeout(later, wait - last);
+    } else {
+      timeout = null;
+      if (!immediate) {
+        result = func.apply(context, args);
+        context = args = null;
+      }
+    }
+  };
+
+  return function() {
+    context = this;
+    args = arguments;
+    timestamp = now();
+    var callNow = immediate && !timeout;
+    if (!timeout) {
+      timeout = setTimeout(later, wait);
+    }
+    if (callNow) {
+      result = func.apply(context, args);
+      context = args = null;
+    }
+
+    return result;
+  };
+}
+
 
 var ColumnView = (function() {
   "use strict";
@@ -26,7 +238,8 @@ var ColumnView = (function() {
     while (prefix = prefixes.shift()) {
       if (prefix in el.style) return prefix;
     }
-    throw new Error("transform not supported");
+    console.warn("transform not supported");
+    return null;
   }
 
   function uid() {
@@ -34,11 +247,16 @@ var ColumnView = (function() {
   }
 
   function ColumnView(el, options) {
-    var that = this, onKeydown, onKeyup;
+    if (!ColumnView.canBrowserHandleThis()) {
+      throw "This browser doesn't support all neccesary EcmaScript 5 Javascript methods.";
+    }
+
+    var that = this, onKeydown, onKeyup, resize;
 
     this.options = options || {};
     this.value = null;
     this.ready = false;
+    this.carriageReady = false;
 
     this.el = el;
     this.domCarriage = this.el.querySelector(".carriage");
@@ -47,18 +265,19 @@ var ColumnView = (function() {
 
     this.models = options.items;
     this.path = options.path;
-    this.mobileLayout = false; //!!options.mobile;
     this.movingUpOrDown = false;
+    this.colCount = 3; //default
 
     this.callbacks = {
       change: that.options.onChange,
-      source: that.options.source
+      source: that.options.source,
+      ready:  that.options.ready
     };
 
-    if (this.mobileLayout) {
-      this.colCount = 1;
-    } else {
-      this.colCount = 3;
+    this.setLayout(options.layout);
+
+    if (options.itemTemplate) {
+      this.CustomSelect.prototype.itemTemplate = options.itemTemplate;
     }
 
     this.uniqueClassName = "column-view-" + uid();
@@ -69,19 +288,26 @@ var ColumnView = (function() {
     // bound functions
     onKeydown = this._onKeydown.bind(this);
     onKeyup = this._onKeyup.bind(this);
+    resize = debounce(this._resize.bind(this), 300);
     this._onColumnChangeBound = this._onColumnChange.bind(this);
     // onResize = _.bind(this._onResize, this);
 
-    if (!this.mobileLayout) {
-      this.el.addEventListener("keydown", onKeydown, true);
-      this.el.addEventListener("keyup", onKeyup, true);
-    }
+    this.el.addEventListener("keydown", onKeydown, true);
+    this.el.addEventListener("keyup", onKeyup, true);
+    window.addEventListener("resize", resize);
 
     // todo prevent scroll when focused and arrow key is pressed
     // this.el.addEventListener("keydown", function(e){e.preventDefault();});
 
     this._initialize();
   }
+
+  ColumnView.canBrowserHandleThis = function canBrowserHandleThis() {
+    return !!Array.prototype.map &&
+           !!Array.prototype.forEach &&
+           !!Array.prototype.map &&
+           !!Function.prototype.bind;
+  };
 
   // instance methods
   // ----------------
@@ -92,6 +318,7 @@ var ColumnView = (function() {
     // --------
 
     columns: function columns() {
+      if (!this.carriageReady) throw "Carriage is not ready"; 
       return _slice.call( this.carriage.children );
     },
 
@@ -101,7 +328,10 @@ var ColumnView = (function() {
     },
 
     canMoveBack: function canMoveBack() {
-      return this.columns().length > 2;
+      if (this.colCount === 3)
+        return this.columns().length > 2;
+      else
+        return this.columns().length > 1;
     },
 
 
@@ -161,7 +391,6 @@ var ColumnView = (function() {
     _onColumnChange: function onColumnChange(columnClass, value, oldValue) {
       var that = this;
       var column = columnClass.el;
-
       if (!this.ready) return;
 
       if (this.movingUpOrDown) {
@@ -198,6 +427,7 @@ var ColumnView = (function() {
     _initialize: function initialize() {
       var that = this;
       var path = this.path || [];
+      console.log("path", path);
       var pathPairs = path.map(function(value, index, array) {
         return [value, array[index+1]];
       });
@@ -225,8 +455,11 @@ var ColumnView = (function() {
         that.domCarriage.innerHTML = "";
         that.domCarriage.appendChild(that.carriage);
         that.carriage = that.domCarriage;
-        that._onResize();
+        that.carriageReady = true;
+        that._resize();
+        that._alignCols();
         that.ready = true;
+        if (that.callbacks.ready) that.callbacks.ready.call(that);
       }
 
       proccessPath();
@@ -256,10 +489,10 @@ var ColumnView = (function() {
 
     _newColInstance: function newColInstance(data, col) {
       var colInst;
+      if (col.customSelect) col.customSelect.clear();
       if (data.dom) {
         colInst = new this.Preview(col, data.dom);
         // reset monkeypatched properties for reused col elements
-        col.customSelect = null; 
       }
       else if (data.items || data.groups) {
         data.onChange = this._onColumnChangeBound;
@@ -274,7 +507,8 @@ var ColumnView = (function() {
     _removeAfter: function removeAfter(col) {
       var cols = this.columns();
       var toRemove = cols.splice(cols.indexOf(col)+1, cols.length);
-      toRemove.forEach(function(col) { col.remove(); });
+      var that = this;
+      toRemove.forEach(function(col) { that.carriage.removeChild(col); });
     },
 
     _alignCols: function alignCols() {
@@ -284,20 +518,53 @@ var ColumnView = (function() {
 
       this.lastAllignment = length;
       var leftOut = Math.max(0, length - this.colCount);
-      this._moveCarriage(leftOut);
+      this.lastLeftOut = leftOut
+      //this._moveCarriage(leftOut);
+      this._resizeY();
     },
 
-    _onResize: function onResize() {
-      // console.log("resize");
+    _resize: function resize() {
       this.colWidth = this.el.offsetWidth / this.colCount;
-      this.style.innerHTML = "." + this.uniqueClassName + " .column { width: " + this.colWidth + "px;}";
-      this._alignCols();
+      this._setStyle("width:"+this.colWidth+"px;");
+      var col = this.columns().slice(-1)[0];
+      var height = col.offsetHeight;
+      this._setStyle("height:"+height+"px;"+"width:"+this.colWidth+"px;");
+      this._moveCarriage(this.lastLeftOut, {transition: false});
     },
 
-    _moveCarriage: function moveCarriage(leftOut) {
+    _resizeY: function resize() {
+      this.colWidth = this.el.offsetWidth / this.colCount;
+      this._setStyle("width:"+this.colWidth+"px;");
+      var col = this.columns().slice(-1)[0];
+      var height = col.offsetHeight;
+      this._setStyle("height:"+height+"px;"+"width:"+this.colWidth+"px;");
+      this._moveCarriage(this.lastLeftOut);
+    },
+
+    _setStyle: function setStyle(css) {
+      this.style.innerHTML = "."+this.uniqueClassName+" .column {"+css+"}";
+    },
+
+    setLayout: function setLayout(layout) {
+      // console.log("setLayout", layout);
+      if (layout == "mobile") {
+        this.colCount = 1;
+        this.el.classList.add("mobile");
+      } else {
+        this.colCount = 3;
+        this.el.classList.remove("mobile");
+      }
+      if (!this.ready) return;
+      this._resize();
+    },
+
+    _moveCarriage: function moveCarriage(leftOut, options) {
+      options = options || {};
+      if (!options.hasOwnProperty("transition")) options.transition = true
+      this.lastLeftOut = leftOut;
       // console.log("move", this.ready)
       var left = -1 * leftOut * this.colWidth;
-      this.carriage.classList.toggle("transition", this.ready);
+      this.carriage.classList.toggle("transition", this.ready && options.transition);
       this.carriage.style[transformPrefix] = "translate("+left+"px, 0px)";
     },
 
@@ -308,6 +575,7 @@ var ColumnView = (function() {
       var lastCol = this.focusedColumn();
       this._removeAfter(lastCol);
       // triggers no change
+      //if (lastCol.customSelect) 
       lastCol.customSelect.deselect(); // COL ACTION!!!!!!
 
       this._alignCols();
@@ -345,6 +613,7 @@ function htmlToDocumentFragment(html) {
   return frag;
 }
 
+
 ColumnView.prototype.CustomSelect = (function() {
   "use strict";
 
@@ -369,9 +638,8 @@ ColumnView.prototype.CustomSelect = (function() {
 
     this.el.setAttribute("role", "group");
 
-    
-
-    this.el.addEventListener("click", this._onClick.bind(this));
+    this.boundOnClick = this._onClick.bind(this);
+    this.el.addEventListener("click", this.boundOnClick);
 
     this._monkeyPatchEl();
 
@@ -388,12 +656,14 @@ ColumnView.prototype.CustomSelect = (function() {
       var selectIndex = this.selectIndex.bind(this);
       var movePosition = this.movePosition.bind(this);
       var deselect = this.deselect.bind(this);
+      var clear = this.clear.bind(this);
       var selectValue = this.selectValue.bind(this);
       var elMethods = {
         selectIndex: selectIndex,
         movePosition: movePosition,
         deselect: deselect,
         selectValue: selectValue,
+        clear: clear,
         value : function value() { return that.value; }
       };
       this.el.customSelect = elMethods;
@@ -442,17 +712,21 @@ ColumnView.prototype.CustomSelect = (function() {
       container.appendChild(el);
     },
 
-    _scrollIntoView: function scrollIntoView() {
-      var itemRect = this._selectedEl.getBoundingClientRect();
-      var elRect = this.el.getBoundingClientRect();
-      var relativeToBottom = elRect.height - itemRect.bottom;
+    clear: function clear() {
+      this.el.customSelect = null;
+      this.el.removeEventListener("click", this.boundOnClick);
+    },
 
-      if (relativeToBottom < 0) {
-        this._selectedEl.scrollIntoView(false);
+    _scrollIntoView: function scrollIntoView() {
+      var elRect = this.el.getBoundingClientRect();
+      var itemRect = this._selectedEl.getBoundingClientRect();
+      
+      if (itemRect.bottom > elRect.bottom) {
+        this.el.scrollTop += itemRect.bottom - elRect.bottom;
       }
 
-      if (itemRect.top < 0) {
-        this._selectedEl.scrollIntoView(true);
+      if (itemRect.top < elRect.top) {
+        this.el.scrollTop -= elRect.top - itemRect.top;
       }
     },
 
@@ -468,7 +742,7 @@ ColumnView.prototype.CustomSelect = (function() {
       el.classList.add("selected");
       this._selectedEl = el;
       var oldValue = this.value;
-      this.value = el.dataset.value;
+      this.value = el.getAttribute("data-value");
       this.changeCB(this, this.value, oldValue);
     },
 

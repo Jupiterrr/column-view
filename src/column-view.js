@@ -1,3 +1,38 @@
+function debounce(func, wait, immediate) {
+  var timeout, args, context, timestamp, result;
+
+  function now() { new Date().getTime(); }
+
+  var later = function() {
+    var last = now() - timestamp;
+    if (last < wait) {
+      timeout = setTimeout(later, wait - last);
+    } else {
+      timeout = null;
+      if (!immediate) {
+        result = func.apply(context, args);
+        context = args = null;
+      }
+    }
+  };
+
+  return function() {
+    context = this;
+    args = arguments;
+    timestamp = now();
+    var callNow = immediate && !timeout;
+    if (!timeout) {
+      timeout = setTimeout(later, wait);
+    }
+    if (callNow) {
+      result = func.apply(context, args);
+      context = args = null;
+    }
+
+    return result;
+  };
+}
+
 
 var ColumnView = (function() {
   "use strict";
@@ -26,7 +61,8 @@ var ColumnView = (function() {
     while (prefix = prefixes.shift()) {
       if (prefix in el.style) return prefix;
     }
-    throw new Error("transform not supported");
+    console.warn("transform not supported");
+    return null;
   }
 
   function uid() {
@@ -34,11 +70,16 @@ var ColumnView = (function() {
   }
 
   function ColumnView(el, options) {
-    var that = this, onKeydown, onKeyup;
+    if (!ColumnView.canBrowserHandleThis()) {
+      throw "This browser doesn't support all neccesary EcmaScript 5 Javascript methods.";
+    }
+
+    var that = this, onKeydown, onKeyup, resize;
 
     this.options = options || {};
     this.value = null;
     this.ready = false;
+    this.carriageReady = false;
 
     this.el = el;
     this.domCarriage = this.el.querySelector(".carriage");
@@ -47,18 +88,19 @@ var ColumnView = (function() {
 
     this.models = options.items;
     this.path = options.path;
-    this.mobileLayout = false; //!!options.mobile;
     this.movingUpOrDown = false;
+    this.colCount = 3; //default
 
     this.callbacks = {
       change: that.options.onChange,
-      source: that.options.source
+      source: that.options.source,
+      ready:  that.options.ready
     };
 
-    if (this.mobileLayout) {
-      this.colCount = 1;
-    } else {
-      this.colCount = 3;
+    this.setLayout(options.layout);
+
+    if (options.itemTemplate) {
+      this.CustomSelect.prototype.itemTemplate = options.itemTemplate;
     }
 
     this.uniqueClassName = "column-view-" + uid();
@@ -69,19 +111,26 @@ var ColumnView = (function() {
     // bound functions
     onKeydown = this._onKeydown.bind(this);
     onKeyup = this._onKeyup.bind(this);
+    resize = debounce(this._resize.bind(this), 300);
     this._onColumnChangeBound = this._onColumnChange.bind(this);
     // onResize = _.bind(this._onResize, this);
 
-    if (!this.mobileLayout) {
-      this.el.addEventListener("keydown", onKeydown, true);
-      this.el.addEventListener("keyup", onKeyup, true);
-    }
+    this.el.addEventListener("keydown", onKeydown, true);
+    this.el.addEventListener("keyup", onKeyup, true);
+    window.addEventListener("resize", resize);
 
     // todo prevent scroll when focused and arrow key is pressed
     // this.el.addEventListener("keydown", function(e){e.preventDefault();});
 
     this._initialize();
   }
+
+  ColumnView.canBrowserHandleThis = function canBrowserHandleThis() {
+    return !!Array.prototype.map &&
+           !!Array.prototype.forEach &&
+           !!Array.prototype.map &&
+           !!Function.prototype.bind;
+  };
 
   // instance methods
   // ----------------
@@ -92,6 +141,7 @@ var ColumnView = (function() {
     // --------
 
     columns: function columns() {
+      if (!this.carriageReady) throw "Carriage is not ready"; 
       return _slice.call( this.carriage.children );
     },
 
@@ -101,7 +151,10 @@ var ColumnView = (function() {
     },
 
     canMoveBack: function canMoveBack() {
-      return this.columns().length > 2;
+      if (this.colCount === 3)
+        return this.columns().length > 2;
+      else
+        return this.columns().length > 1;
     },
 
 
@@ -161,7 +214,6 @@ var ColumnView = (function() {
     _onColumnChange: function onColumnChange(columnClass, value, oldValue) {
       var that = this;
       var column = columnClass.el;
-
       if (!this.ready) return;
 
       if (this.movingUpOrDown) {
@@ -198,6 +250,7 @@ var ColumnView = (function() {
     _initialize: function initialize() {
       var that = this;
       var path = this.path || [];
+      console.log("path", path);
       var pathPairs = path.map(function(value, index, array) {
         return [value, array[index+1]];
       });
@@ -225,8 +278,11 @@ var ColumnView = (function() {
         that.domCarriage.innerHTML = "";
         that.domCarriage.appendChild(that.carriage);
         that.carriage = that.domCarriage;
-        that._onResize();
+        that.carriageReady = true;
+        that._resize();
+        that._alignCols();
         that.ready = true;
+        if (that.callbacks.ready) that.callbacks.ready.call(that);
       }
 
       proccessPath();
@@ -256,10 +312,10 @@ var ColumnView = (function() {
 
     _newColInstance: function newColInstance(data, col) {
       var colInst;
+      if (col.customSelect) col.customSelect.clear();
       if (data.dom) {
         colInst = new this.Preview(col, data.dom);
         // reset monkeypatched properties for reused col elements
-        col.customSelect = null; 
       }
       else if (data.items || data.groups) {
         data.onChange = this._onColumnChangeBound;
@@ -274,7 +330,8 @@ var ColumnView = (function() {
     _removeAfter: function removeAfter(col) {
       var cols = this.columns();
       var toRemove = cols.splice(cols.indexOf(col)+1, cols.length);
-      toRemove.forEach(function(col) { col.remove(); });
+      var that = this;
+      toRemove.forEach(function(col) { that.carriage.removeChild(col); });
     },
 
     _alignCols: function alignCols() {
@@ -284,20 +341,53 @@ var ColumnView = (function() {
 
       this.lastAllignment = length;
       var leftOut = Math.max(0, length - this.colCount);
-      this._moveCarriage(leftOut);
+      this.lastLeftOut = leftOut
+      //this._moveCarriage(leftOut);
+      this._resizeY();
     },
 
-    _onResize: function onResize() {
-      // console.log("resize");
+    _resize: function resize() {
       this.colWidth = this.el.offsetWidth / this.colCount;
-      this.style.innerHTML = "." + this.uniqueClassName + " .column { width: " + this.colWidth + "px;}";
-      this._alignCols();
+      this._setStyle("width:"+this.colWidth+"px;");
+      var col = this.columns().slice(-1)[0];
+      var height = col.offsetHeight;
+      this._setStyle("height:"+height+"px;"+"width:"+this.colWidth+"px;");
+      this._moveCarriage(this.lastLeftOut, {transition: false});
     },
 
-    _moveCarriage: function moveCarriage(leftOut) {
+    _resizeY: function resize() {
+      this.colWidth = this.el.offsetWidth / this.colCount;
+      this._setStyle("width:"+this.colWidth+"px;");
+      var col = this.columns().slice(-1)[0];
+      var height = col.offsetHeight;
+      this._setStyle("height:"+height+"px;"+"width:"+this.colWidth+"px;");
+      this._moveCarriage(this.lastLeftOut);
+    },
+
+    _setStyle: function setStyle(css) {
+      this.style.innerHTML = "."+this.uniqueClassName+" .column {"+css+"}";
+    },
+
+    setLayout: function setLayout(layout) {
+      // console.log("setLayout", layout);
+      if (layout == "mobile") {
+        this.colCount = 1;
+        this.el.classList.add("mobile");
+      } else {
+        this.colCount = 3;
+        this.el.classList.remove("mobile");
+      }
+      if (!this.ready) return;
+      this._resize();
+    },
+
+    _moveCarriage: function moveCarriage(leftOut, options) {
+      options = options || {};
+      if (!options.hasOwnProperty("transition")) options.transition = true
+      this.lastLeftOut = leftOut;
       // console.log("move", this.ready)
       var left = -1 * leftOut * this.colWidth;
-      this.carriage.classList.toggle("transition", this.ready);
+      this.carriage.classList.toggle("transition", this.ready && options.transition);
       this.carriage.style[transformPrefix] = "translate("+left+"px, 0px)";
     },
 
@@ -308,6 +398,7 @@ var ColumnView = (function() {
       var lastCol = this.focusedColumn();
       this._removeAfter(lastCol);
       // triggers no change
+      //if (lastCol.customSelect) 
       lastCol.customSelect.deselect(); // COL ACTION!!!!!!
 
       this._alignCols();

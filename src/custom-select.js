@@ -11,6 +11,7 @@ function htmlToDocumentFragment(html) {
   return frag;
 }
 
+
 ColumnView.prototype.CustomSelect = (function() {
   "use strict";
 
@@ -35,9 +36,8 @@ ColumnView.prototype.CustomSelect = (function() {
 
     this.el.setAttribute("role", "group");
 
-    
-
-    this.el.addEventListener("click", this._onClick.bind(this));
+    this.boundOnClick = this._onClick.bind(this);
+    this.el.addEventListener("click", this.boundOnClick);
 
     this._monkeyPatchEl();
 
@@ -54,12 +54,14 @@ ColumnView.prototype.CustomSelect = (function() {
       var selectIndex = this.selectIndex.bind(this);
       var movePosition = this.movePosition.bind(this);
       var deselect = this.deselect.bind(this);
+      var clear = this.clear.bind(this);
       var selectValue = this.selectValue.bind(this);
       var elMethods = {
         selectIndex: selectIndex,
         movePosition: movePosition,
         deselect: deselect,
         selectValue: selectValue,
+        clear: clear,
         value : function value() { return that.value; }
       };
       this.el.customSelect = elMethods;
@@ -108,6 +110,11 @@ ColumnView.prototype.CustomSelect = (function() {
       container.appendChild(el);
     },
 
+    clear: function clear() {
+      this.el.customSelect = null;
+      this.el.removeEventListener("click", this.boundOnClick);
+    },
+
     _scrollIntoView: function scrollIntoView() {
       var elRect = this.el.getBoundingClientRect();
       var itemRect = this._selectedEl.getBoundingClientRect();
@@ -133,7 +140,7 @@ ColumnView.prototype.CustomSelect = (function() {
       el.classList.add("selected");
       this._selectedEl = el;
       var oldValue = this.value;
-      this.value = el.dataset.value;
+      this.value = el.getAttribute("data-value");
       this.changeCB(this, this.value, oldValue);
     },
 
