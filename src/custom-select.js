@@ -118,7 +118,7 @@ ColumnView.prototype.CustomSelect = (function() {
     _scrollIntoView: function scrollIntoView() {
       var elRect = this.el.getBoundingClientRect();
       var itemRect = this._selectedEl.getBoundingClientRect();
-      
+
       if (itemRect.bottom > elRect.bottom) {
         this.el.scrollTop += itemRect.bottom - elRect.bottom;
       }
@@ -186,7 +186,7 @@ ColumnView.prototype.CustomSelect = (function() {
     itemTemplate: function itemTemplate(data) {
       return '<div class="item" data-value="'+data.value+'" role="treeitem">'+data.name+'</div>';
     },
-    
+
     groupTemplate: function groupTemplate(data) {
       return '<div class="divider">'+data.title+'</div>';
     }
@@ -214,4 +214,3 @@ ColumnView.prototype.Preview = (function() {
   };
   return Preview;
 })();
-

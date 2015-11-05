@@ -174,7 +174,6 @@ if (objCtr.defineProperty) {
 }(self));
 
 }
-
 function debounce(func, wait, immediate) {
   var timeout, args, context, timestamp, result;
 
@@ -230,7 +229,7 @@ var ColumnView = (function() {
   _slice = Array.prototype.slice;
 
   transformPrefix = getTransformPrefix();
-  
+
   function getTransformPrefix() {
     var el = document.createElement("_");
     var prefixes = ["transform", "webkitTransform", "MozTransform", "msTransform", "OTransform"];
@@ -318,7 +317,7 @@ var ColumnView = (function() {
     // --------
 
     columns: function columns() {
-      if (!this.carriageReady) throw "Carriage is not ready"; 
+      if (!this.carriageReady) throw "Carriage is not ready";
       return _slice.call( this.carriage.children );
     },
 
@@ -423,7 +422,7 @@ var ColumnView = (function() {
     },
 
     // Calls the source callback for each value in
-    // this.path and append the new columns 
+    // this.path and append the new columns
     _initialize: function initialize() {
       var that = this;
       var path = this.path || [];
@@ -479,6 +478,7 @@ var ColumnView = (function() {
         col = this.lastColEl;
         col.innerHTML = "";
         // col.selectIndex = null;
+        col.scrollTop = 0;
       } else {
         col = document.createElement("div");
         col.classList.add("column");
@@ -575,7 +575,7 @@ var ColumnView = (function() {
       var lastCol = this.focusedColumn();
       this._removeAfter(lastCol);
       // triggers no change
-      //if (lastCol.customSelect) 
+      //if (lastCol.customSelect)
       lastCol.customSelect.deselect(); // COL ACTION!!!!!!
 
       this._alignCols();
@@ -590,15 +590,6 @@ var ColumnView = (function() {
 
 
 })();
-
-
-
-
-
-
-
-
-
 
 
 function htmlToDocumentFragment(html) {
@@ -720,7 +711,7 @@ ColumnView.prototype.CustomSelect = (function() {
     _scrollIntoView: function scrollIntoView() {
       var elRect = this.el.getBoundingClientRect();
       var itemRect = this._selectedEl.getBoundingClientRect();
-      
+
       if (itemRect.bottom > elRect.bottom) {
         this.el.scrollTop += itemRect.bottom - elRect.bottom;
       }
@@ -788,7 +779,7 @@ ColumnView.prototype.CustomSelect = (function() {
     itemTemplate: function itemTemplate(data) {
       return '<div class="item" data-value="'+data.value+'" role="treeitem">'+data.name+'</div>';
     },
-    
+
     groupTemplate: function groupTemplate(data) {
       return '<div class="divider">'+data.title+'</div>';
     }
@@ -816,4 +807,3 @@ ColumnView.prototype.Preview = (function() {
   };
   return Preview;
 })();
-
