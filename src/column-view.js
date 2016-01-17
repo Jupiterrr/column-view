@@ -1,9 +1,11 @@
+"use strict";
+
 function debounce(func, wait, immediate) {
   var timeout, args, context, timestamp, result;
 
   function now() { new Date().getTime(); }
 
-  var later = function() {
+  var later = () => {
     var last = now() - timestamp;
     if (last < wait) {
       timeout = setTimeout(later, wait - last);
@@ -16,16 +18,13 @@ function debounce(func, wait, immediate) {
     }
   };
 
-  return function() {
-    context = this;
+  return () => {
     args = arguments;
     timestamp = now();
-    var callNow = immediate && !timeout;
-    if (!timeout) {
-      timeout = setTimeout(later, wait);
-    }
+    const callNow = immediate && !timeout;
+    if (!timeout) timeout = setTimeout(later, wait);
     if (callNow) {
-      result = func.apply(context, args);
+      result = func.apply(this, args);
       context = args = null;
     }
 
@@ -33,384 +32,165 @@ function debounce(func, wait, immediate) {
   };
 }
 
+class ColumnView {
 
-var ColumnView = (function() {
-  "use strict";
-
-  var keyCodes, _slice, transformPrefix;
-
-  keyCodes = {
-    enter: 13,
-    space: 32,
-    backspace: 8,
-    tab: 9,
-    left: 37,
-    up: 38,
-    right: 39,
-    down: 40,
-  };
-
-  _slice = Array.prototype.slice;
-
-  transformPrefix = getTransformPrefix();
-
-  function getTransformPrefix() {
-    var el = document.createElement("_");
-    var prefixes = ["transform", "webkitTransform", "MozTransform", "msTransform", "OTransform"];
-    var prefix;
-    while (prefix = prefixes.shift()) {
-      if (prefix in el.style) return prefix;
-    }
-    console.warn("transform not supported");
-    return null;
-  }
-
-  function uid() {
-    return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-  }
-
-  function ColumnView(el, options) {
-    if (!ColumnView.canBrowserHandleThis()) {
-      throw "This browser doesn't support all neccesary EcmaScript 5 Javascript methods.";
-    }
-
-    var that = this, onKeydown, onKeyup, resize;
-
+  constructor(el, options) {
     this.options = options || {};
     this.value = null;
     this.ready = false;
     this.carriageReady = false;
-
-    this.el = el;
-    this.domCarriage = this.el.querySelector(".carriage");
-    this.carriage = document.createDocumentFragment();
-    this.style = this.el.querySelector("style");
-
-    this.models = options.items;
-    this.path = options.path;
-    this.movingUpOrDown = false;
     this.colCount = 3; //default
 
+    this.el = el;
+    this.carriageManager = new CariageManager(this);
+    this.carriageManager.changeCallbacks.push((data) => {
+      // console.log("change");
+      this.el.setAttribute("aria-activedescendant", `cv-${this.uid}-${data.key}`);
+    });
+
+    this.keyboardManager = new KeyboardManager(this);
+    this.keyboardManager.changeCallback = this._onColumnChange.bind(this);
+
+    this.models = options.items;
+    this.path = options.path || [];
+
     this.callbacks = {
-      change: that.options.onChange,
-      source: that.options.source,
-      ready:  that.options.ready
+      change: this.options.onChange,
+      source: (data) => new Promise((resolve, reject) => {
+        this.options.source(data, (result) => {
+          this._checkSourceResponse(result, reject);
+          resolve(result);
+        });
+      }),
+      ready:  this.options.ready,
     };
 
-    this.setLayout(options.layout);
+    // this.carriageManager._setLayout(options.layout);
 
     if (options.itemTemplate) {
       this.CustomSelect.prototype.itemTemplate = options.itemTemplate;
     }
 
-    this.uniqueClassName = "column-view-" + uid();
+    this.uid = this._uid();
+    this.uniqueClassName = `column-view-${this.uid}`;
     this.el.classList.add(this.uniqueClassName);
     this.el.setAttribute("tabindex", 0);
     this.el.setAttribute("role", "tree");
 
-    // bound functions
-    onKeydown = this._onKeydown.bind(this);
-    onKeyup = this._onKeyup.bind(this);
-    resize = debounce(this._resize.bind(this), 300);
     this._onColumnChangeBound = this._onColumnChange.bind(this);
-    // onResize = _.bind(this._onResize, this);
 
-    this.el.addEventListener("keydown", onKeydown, true);
-    this.el.addEventListener("keyup", onKeyup, true);
-    window.addEventListener("resize", resize);
+    // window.addEventListener("resize", debounce(this._resize.bind(this), 300));
 
-    // todo prevent scroll when focused and arrow key is pressed
-    // this.el.addEventListener("keydown", function(e){e.preventDefault();});
-
-    this._initialize();
+    // console.log("path", this.path);
+    this._loadDataBySourceCalls(this.path).then((columnDataItems) => {
+      this.carriageManager.seed(columnDataItems);
+      this.ready = true;
+      if (this.callbacks.ready) this.callbacks.ready.call(this);
+    });
   }
 
-  ColumnView.canBrowserHandleThis = function canBrowserHandleThis() {
-    return !!Array.prototype.map &&
-           !!Array.prototype.forEach &&
-           !!Array.prototype.map &&
-           !!Function.prototype.bind;
-  };
-
-  // instance methods
-  // ----------------
-
-  ColumnView.prototype = {
-
-    // Getter
-    // --------
-
-    columns: function columns() {
-      if (!this.carriageReady) throw "Carriage is not ready";
-      return _slice.call( this.carriage.children );
-    },
-
-    focusedColumn: function focusedColumn() {
-      var cols = this.columns();
-      return cols[cols.length-2] || cols[0];
-    },
-
-    canMoveBack: function canMoveBack() {
-      if (this.colCount === 3)
-        return this.columns().length > 2;
-      else
-        return this.columns().length > 1;
-    },
-
-
-    // Keyboard
-    // --------
-
-    _onKeydown: function onKeydown(e) {
-      this.movingUpOrDown = false;
-      if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey)
-        return; // do nothing
-
-      switch (e.keyCode) {
-        case keyCodes.left:
-        case keyCodes.backspace:
-          this._keyLeft();
-          e.preventDefault();
-          break;
-        case keyCodes.right:
-        case keyCodes.space:
-        case keyCodes.enter:
-          this._keyRight();
-          e.preventDefault();
-          break;
-        case keyCodes.up:
-          this.movingUpOrDown = true;
-          this._moveCursor(-1);
-          e.preventDefault();
-          break;
-        case keyCodes.down:
-          this.movingUpOrDown = true;
-          this._moveCursor(1);
-          e.preventDefault();
-          break;
-        default:
-          return;
+  _checkSourceResponse(result, reject) {
+    let checkItems = (items) => {
+      if (!result.items.every((item) => 'key' in item)) {
+        console.error("'key' propertie is missing on at least one item!", result);
+        reject("'key' propertie is missing on at least one item!", result);
       }
-    },
-
-    _onKeyup: function onKeyup() {
-      this.movingUpOrDown = false;
-      if (this.fastMoveChangeFn) this.fastMoveChangeFn();
-    },
-
-    _keyLeft: function keyLeft() { this.back(); },
-
-    _keyRight: function keyRight() {
-      var col = this.carriage.lastChild;
-      if (col.customSelect) col.customSelect.selectIndex(0); // COL ACTION!!!!!!
-      // triggers change
-    },
-
-    _moveCursor: function moveCursor(direction) {
-      var col = this.focusedColumn();
-      col.customSelect.movePosition(direction);
-    },
-
-    _onColumnChange: function onColumnChange(columnClass, value, oldValue) {
-      var that = this;
-      var column = columnClass.el;
-      if (!this.ready) return;
-
-      if (this.movingUpOrDown) {
-        this.fastMoveChangeFn = function() { that._onColumnChange(columnClass, value, oldValue); };
-        return;
-      }
-
-      this.fastMoveChangeFn = null;
-      // console.log("cv change", value)
-
-      this.value = value;
-
-      if (this.focusedColumn() == column && this.columns().indexOf(column) !== 0) {
-        this.lastColEl = this.carriage.lastChild;
-      } else {
-        this._removeAfter(column);
-        this.lastColEl = null;
-      }
-      // console.log("horizontal change", this._activeCol == column)
-
-      function appendIfValueIsSame(data) {
-        if (that.value !== value) return;
-        that._appendCol(data);
-        that.callbacks.change.call(that, value);
-      }
-
-      this.callbacks.source(value, appendIfValueIsSame);
-
-      // todo handle case case no callback is called
-    },
-
-    // Calls the source callback for each value in
-    // this.path and append the new columns
-    _initialize: function initialize() {
-      var that = this;
-      var path = this.path || [];
-      console.log("path", path);
-      var pathPairs = path.map(function(value, index, array) {
-        return [value, array[index+1]];
-      });
-      this.carriage.innerHTML = "";
-
-      function proccessPathPair(pathPair, cb) {
-        var id = pathPair[0], nextID = pathPair[1];
-        var customSelect;
-        that.callbacks.source(String(id), function(data) {
-          if (nextID) data.selectedValue = String(nextID);
-          customSelect = that._appendCol(data);
-          cb();
-        });
-      }
-
-      function proccessPath() {
-        var pathPair = pathPairs.shift();
-        if (pathPair)
-          proccessPathPair(pathPair, proccessPath);
-        else
-          ready();
-      }
-
-      function ready() {
-        that.domCarriage.innerHTML = "";
-        that.domCarriage.appendChild(that.carriage);
-        that.carriage = that.domCarriage;
-        that.carriageReady = true;
-        that._resize();
-        that._alignCols();
-        that.ready = true;
-        if (that.callbacks.ready) that.callbacks.ready.call(that);
-      }
-
-      proccessPath();
-    },
-
-    _appendCol: function appendCol(data) {
-      var col = this._createCol(data);
-      if (this.ready) this._alignCols();
-      this.lastColEl = null;
-      return col;
-    },
-
-    _createCol: function createCol(data) {
-      var col;
-      // use existing col if possible
-      if (this.lastColEl) {
-        col = this.lastColEl;
-        col.innerHTML = "";
-        // col.selectIndex = null;
-        col.scrollTop = 0;
-      } else {
-        col = document.createElement("div");
-        col.classList.add("column");
-        this.carriage.appendChild(col);
-      }
-      return this._newColInstance(data, col);
-    },
-
-    _newColInstance: function newColInstance(data, col) {
-      var colInst;
-      if (col.customSelect) col.customSelect.clear();
-      if (data.dom) {
-        colInst = new this.Preview(col, data.dom);
-        // reset monkeypatched properties for reused col elements
-      }
-      else if (data.items || data.groups) {
-        data.onChange = this._onColumnChangeBound;
-        colInst = new this.CustomSelect(col, data);
-      }
-      else {
-        throw "Type error";
-      }
-      return colInst;
-    },
-
-    _removeAfter: function removeAfter(col) {
-      var cols = this.columns();
-      var toRemove = cols.splice(cols.indexOf(col)+1, cols.length);
-      var that = this;
-      toRemove.forEach(function(col) { that.carriage.removeChild(col); });
-    },
-
-    _alignCols: function alignCols() {
-      var length = this.columns().length;
-      if (this.lastAllignment === length)
-        return; // skip if nothing has changed
-
-      this.lastAllignment = length;
-      var leftOut = Math.max(0, length - this.colCount);
-      this.lastLeftOut = leftOut
-      //this._moveCarriage(leftOut);
-      this._resizeY();
-    },
-
-    _resize: function resize() {
-      this.colWidth = this.el.offsetWidth / this.colCount;
-      this._setStyle("width:"+this.colWidth+"px;");
-      var col = this.columns().slice(-1)[0];
-      var height = col.offsetHeight;
-      this._setStyle("height:"+height+"px;"+"width:"+this.colWidth+"px;");
-      this._moveCarriage(this.lastLeftOut, {transition: false});
-    },
-
-    _resizeY: function resize() {
-      this.colWidth = this.el.offsetWidth / this.colCount;
-      this._setStyle("width:"+this.colWidth+"px;");
-      var col = this.columns().slice(-1)[0];
-      var height = col.offsetHeight;
-      this._setStyle("height:"+height+"px;"+"width:"+this.colWidth+"px;");
-      this._moveCarriage(this.lastLeftOut);
-    },
-
-    _setStyle: function setStyle(css) {
-      this.style.innerHTML = "."+this.uniqueClassName+" .column {"+css+"}";
-    },
-
-    setLayout: function setLayout(layout) {
-      // console.log("setLayout", layout);
-      if (layout == "mobile") {
-        this.colCount = 1;
-        this.el.classList.add("mobile");
-      } else {
-        this.colCount = 3;
-        this.el.classList.remove("mobile");
-      }
-      if (!this.ready) return;
-      this._resize();
-    },
-
-    _moveCarriage: function moveCarriage(leftOut, options) {
-      options = options || {};
-      if (!options.hasOwnProperty("transition")) options.transition = true
-      this.lastLeftOut = leftOut;
-      // console.log("move", this.ready)
-      var left = -1 * leftOut * this.colWidth;
-      this.carriage.classList.toggle("transition", this.ready && options.transition);
-      this.carriage.style[transformPrefix] = "translate("+left+"px, 0px)";
-    },
-
-    // ### public
-
-    back: function back() {
-      if (!this.canMoveBack()) return;
-      var lastCol = this.focusedColumn();
-      this._removeAfter(lastCol);
-      // triggers no change
-      //if (lastCol.customSelect)
-      lastCol.customSelect.deselect(); // COL ACTION!!!!!!
-
-      this._alignCols();
-      this.value = this.focusedColumn().customSelect.value();
-      this.callbacks.change.call(this, this.value);
     }
 
+    if ('items' in result) checkItems(result.items);
+    if ('groups' in result) result.groups.every((group) => checkItems(group.items));
+  }
 
-  };
+  // Getter
+  // --------
 
-  return ColumnView;
+  // TODO remove
+  get columns() {
+    return this.carriageManager.columns;
+  }
 
+  get canMoveBack() {
+    switch (this.colCount) {
+      case 3:
+        return this.columns.length > 2;
+      case 1:
+        return this.columns.length > 1;
+      default:
+        console.warn("canMoveBack case not defined");
+        return false;
+    }
+  }
 
-})();
+  // @private
+  _onColumnChange(data) {
+    var column = data.column.el;
+
+    // console.log("_onColumnChange", arguments);
+    // TODO get rid of value
+    this.value = data.key;
+
+    this.carriageManager._removeAfter(column);
+
+    this.callbacks.source(data).then((_data) => {
+      if (this.value != data.key) return; // this call is outdated
+      this.carriageManager._appendCol(_data);
+      this.callbacks.change.call(this, data);
+    });
+
+    // todo handle case case no callback is called
+  }
+
+  _loadDataBySourceCalls(path) {
+    const pathPairs = path.map((value, i, array) => [value, array[i + 1]]);
+
+    var promises = pathPairs.map((pathPair) => {
+      const id = pathPair[0], nextID = pathPair[1];
+      return this.callbacks.source({ key: id, seed: true })
+        .then((data) => {
+          if (nextID) data.selectedValue = nextID;
+          return data;
+        });
+    });
+    return Promise.all(promises);
+  }
+
+  back() {
+    if (!this.canMoveBack) return;
+    this.carriageManager.back();
+    this.value = this.carriageManager.focusedColumn.customSelect.value();
+    this.callbacks.change.call(this, this.value);
+  }
+
+  _uid() {
+    return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+  }
+
+  // _transform(json) {
+  //   var obj = typeof json == "object" ? json : JSON.parse(json);
+  //   var nodes = {};
+  //   var id = 0;
+  //
+  //   function parse(node) {
+  //     var _ids = [];
+  //     for (var i in node) {
+  //       var _id = id++;
+  //       _ids.push(_id);
+  //
+  //       if (typeof node[i] == "string" || (typeof node[i] == "object" && "__" in node[i])) {
+  //         var newNode = { name: i, childIDs: [], data: node[i] };
+  //       } else {
+  //         var newNode = { name: i, childIDs: parse(node[i]) };
+  //       }
+  //
+  //       nodes[_id] = newNode;
+  //     }
+  //
+  //     return _ids;
+  //   };
+  //
+  //   var rootId = id++;
+  //   nodes[rootId] = { name: "root", childIDs: parse(obj) };
+  //   return nodes;
+  // }
+
+}

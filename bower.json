@@ -5,7 +5,7 @@
     "Carsten Griesheimer <hallo@carstengriesheimer.de>"
   ],
   "description": "A script to provide a column view component without dependencies and a native feeling.",
-  "main": "src/column-view.js",
+  "main": "dist/column-view.js",
   "keywords": [
     "column",
     "view",

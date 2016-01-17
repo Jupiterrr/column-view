@@ -1,6 +1,6 @@
+"use strict";
 
 function htmlToDocumentFragment(html) {
-  "use strict";
   var frag = document.createDocumentFragment();
   var tmp = document.createElement("body");
   tmp.innerHTML = html;
@@ -8,23 +8,22 @@ function htmlToDocumentFragment(html) {
   while (child = tmp.firstChild) {
     frag.appendChild(child);
   }
+
   return frag;
 }
 
+// aria-owns="catGroup" aria-expanded="false"
+// https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/ARIA_Techniques/Using_the_group_role
 
-ColumnView.prototype.CustomSelect = (function() {
-  "use strict";
+ColumnView.prototype.CustomSelect = class CustomSelect {
 
-  var indexOf = Array.prototype.indexOf;
-
-  // aria-owns="catGroup" aria-expanded="false"
-  // https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/ARIA_Techniques/Using_the_group_role
-
-  function CustomSelect(parent, data) {
+  constructor(parent, data, columnView) {
     if (!data) data = {};
 
     this.el = parent;
+    this.columnView = columnView;
 
+    this.data = data;
     this.models = data.items;
     this.groups = data.groups;
     this.changeCB = data.onChange;
@@ -44,173 +43,174 @@ ColumnView.prototype.CustomSelect = (function() {
     if (this.models || this.groups) this._render(data.selectedValue);
   }
 
-  // instance methods
-  // ----------------
-
-  CustomSelect.prototype = {
-
-    _monkeyPatchEl: function monkeyPatchEl() {
-      var that = this;
-      var selectIndex = this.selectIndex.bind(this);
-      var movePosition = this.movePosition.bind(this);
-      var deselect = this.deselect.bind(this);
-      var clear = this.clear.bind(this);
-      var selectValue = this.selectValue.bind(this);
-      var elMethods = {
-        selectIndex: selectIndex,
-        movePosition: movePosition,
-        deselect: deselect,
-        selectValue: selectValue,
-        clear: clear,
-        value : function value() { return that.value; }
-      };
-      this.el.customSelect = elMethods;
-    },
-
-    _render: function render(selectedValue) {
-      var container = document.createDocumentFragment();
-
-      if (this.groups) {
-        this._renderGroups(container, this.groups);
-      }
-      else if (this.models) {
-        this._renderItems(container, this.models);
-      }
-      else {
-        this._renderEmpty(container);
-      }
-
-      this.el.innerHTML = "";
-      this.el.appendChild(container);
-      this.items = this.el.querySelectorAll(".item");
-      if (selectedValue) this.selectValue(selectedValue);
-    },
-
-    _renderItems: function renderItems(container, models) {
-      var that = this;
-      models.forEach(function(model) {
-        var html = that.itemTemplate(model);
-        var item = htmlToDocumentFragment(html);
-        container.appendChild(item);
-      });
-    },
-
-    _renderGroups: function renderGroups(container, groups) {
-      var that = this;
-      groups.forEach(function(group) {
-        var html = that.groupTemplate(group);
-        var item = htmlToDocumentFragment(html);
-        container.appendChild(item);
-        that._renderItems(container, group.items);
-      });
-    },
-
-    _renderEmpty: function renderEmpty(container) {
-      var el = document.createTextNode("empty");
-      container.appendChild(el);
-    },
-
-    clear: function clear() {
-      this.el.customSelect = null;
-      this.el.removeEventListener("click", this.boundOnClick);
-    },
-
-    _scrollIntoView: function scrollIntoView() {
-      var elRect = this.el.getBoundingClientRect();
-      var itemRect = this._selectedEl.getBoundingClientRect();
-
-      if (itemRect.bottom > elRect.bottom) {
-        this.el.scrollTop += itemRect.bottom - elRect.bottom;
-      }
-
-      if (itemRect.top < elRect.top) {
-        this.el.scrollTop -= elRect.top - itemRect.top;
-      }
-    },
-
-    _deselect: function deselect(el) {
-      el.classList.remove("selected");
-      this._selectedEl = null;
-    },
-
-    _select: function select(el) {
-      if (this._selectedEl === el) return;
-
-      if (this._selectedEl) this._deselect(this._selectedEl);
-      el.classList.add("selected");
-      this._selectedEl = el;
-      var oldValue = this.value;
-      this.value = el.getAttribute("data-value");
-      this.changeCB(this, this.value, oldValue);
-    },
-
-    _onClick: function onClick(e) {
-      if (e.ctrlKey || e.metaKey) return;
-      if ( !e.target.classList.contains("item") ) return;
-      e.preventDefault();
-      this._select(e.target);
-    },
-
-    _getActiveIndex: function getActiveIndex() {
-      var active = this._selectedEl;
-      var index = indexOf.call(this.items, active);
-      return index;
-    },
-
-    movePosition: function movePosition(direction) {
-      var index = this._getActiveIndex();
-      this.selectIndex(index+direction);
-    },
-
-    selectIndex:  function selectIndex(index) {
-      var item = this.items[index];
-      if (item) this._select(item);
-      this._scrollIntoView();
-    },
-
-    // ### public
-
-    remove: function remove() {
-      this.el.remove();
-    },
-
-    deselect: function deselect() {
-      if (this._selectedEl) this._deselect(this._selectedEl);
-    },
-
-    selectValue: function selectValue(value) {
-      var el = this.el.querySelector("[data-value='"+value+"']");
-      this._select(el);
-    },
-
-    itemTemplate: function itemTemplate(data) {
-      return '<div class="item" data-value="'+data.value+'" role="treeitem">'+data.name+'</div>';
-    },
-
-    groupTemplate: function groupTemplate(data) {
-      return '<div class="divider">'+data.title+'</div>';
-    }
-
-  };
-
-  return CustomSelect;
-
-})();
-
-
-ColumnView.prototype.Preview = (function() {
-  "use strict";
-
-  function Preview(parent, el) {
-    this.el = parent;
-    this.el.appendChild(el);
-    this.el.classList.add("html");
+  _monkeyPatchEl() {
+    var selectIndex = this.selectIndex.bind(this);
+    var movePosition = this.movePosition.bind(this);
+    var canMoveInPosition = this.canMoveInPosition.bind(this);
+    var deselect = this.deselect.bind(this);
+    var clear = this.clear.bind(this);
+    var selectValue = this._selectValue.bind(this);
+    var elMethods = {
+      selectIndex: selectIndex,
+      movePosition: movePosition,
+      deselect: deselect,
+      selectValue: selectValue,
+      clear: clear,
+      canMoveInPosition: canMoveInPosition,
+      value: () => this.value,
+    };
+    this.el.customSelect = elMethods;
   }
 
-  Preview.prototype = {
-    remove: function remove() {
-      this.el.remove();
+  _render(selectedValue) {
+    var container = document.createDocumentFragment();
+    if (this.data.header) this._renderHeader(container);
+    if (this.groups) {
+      this._renderGroups(container, this.groups);
+    } else if (this.models) {
+      this._renderItems(container, this.models);
+    } else {
+      this._renderEmpty(container);
     }
-  };
-  return Preview;
-})();
+
+    this.el.innerHTML = "";
+    this.el.appendChild(container);
+    this.items = this.el.querySelectorAll(".item");
+    if (selectedValue) this._selectValue(selectedValue);
+  }
+
+  _renderHeader(container) {
+    let header = document.createElement("header");
+    header.innerHTML = this.data.header;
+    container.appendChild(header);
+  }
+
+  _renderItems(container, models) {
+    models.forEach((model) => {
+      var html = this.itemTemplate(model);
+      var item = htmlToDocumentFragment(html);
+      item.firstChild.__columviewData__ = model;
+      container.appendChild(item);
+    });
+  }
+
+  _renderGroups(container, groups) {
+    groups.forEach((group) => {
+      var html = this.groupTemplate(group);
+      var item = htmlToDocumentFragment(html);
+      container.appendChild(item);
+      this._renderItems(container, group.items);
+    });
+  }
+
+  _renderEmpty(container) {
+    var el = document.createTextNode("empty");
+    container.appendChild(el);
+  }
+
+  clear() {
+    this.el.customSelect = null;
+    this.el.removeEventListener("click", this.boundOnClick);
+  }
+
+  _scrollIntoView() {
+    var elRect = this.el.getBoundingClientRect();
+    var itemRect = this._selectedEl.getBoundingClientRect();
+
+    if (itemRect.bottom > elRect.bottom) {
+      this.el.scrollTop += itemRect.bottom - elRect.bottom;
+    }
+
+    if (itemRect.top < elRect.top) {
+      this.el.scrollTop -= elRect.top - itemRect.top;
+      if (this._getActiveIndex() == 0) this.el.scrollTop = 0;
+    }
+  }
+
+  _deselect(el) {
+    el.classList.remove("selected");
+    this._selectedEl = null;
+  }
+
+  _select(el) {
+    if (this._selectedEl === el) return;
+    if (this._selectedEl) this._deselect(this._selectedEl);
+    el.classList.add("selected");
+    this._selectedEl = el;
+    var oldValue = this.value;
+    this.value = el.__columviewData__;
+
+    // console.log("select", this.value);
+    this.changeCB(this, this.value, oldValue);
+  }
+
+  _onClick(e) {
+    if (e.ctrlKey || e.metaKey) return;
+    if (!e.target.classList.contains("item")) return;
+    e.preventDefault();
+    this._select(e.target);
+  }
+
+  _getActiveIndex() {
+    var active = this._selectedEl;
+    var index = [].indexOf.call(this.items, active);
+    return index;
+  }
+
+  canMoveInPosition(direction) {
+    var index = this._getActiveIndex();
+    var newIndex = index + direction;
+    return newIndex >= 0 && newIndex < this.items.length;
+  }
+
+  movePosition(direction) {
+    var index = this._getActiveIndex();
+    this.selectIndex(index + direction);
+  }
+
+  selectIndex(index) {
+    var item = this.items[index];
+    if (item) this._select(item);
+    this._scrollIntoView();
+  }
+
+  remove() {
+    this.el.remove();
+  }
+
+  deselect() {
+    if (this._selectedEl) this._deselect(this._selectedEl);
+  }
+
+  _selectValue(key) {
+    var el = this.el.querySelector(`[data-value='${key}']`);
+    this._select(el);
+  }
+
+  itemTemplate(data) {
+    return `<div id="cv-${this.columnView.uid}-${data.key}" class="item" data-value="${data.key}" role="listitem">${data.name}</div>`;
+  }
+
+  groupTemplate(data) {
+    return `<div class="divider">${data.title }</div>`;
+  }
+
+};
+
+ColumnView.prototype.Preview = class Preview {
+
+  constructor(parent, dom) {
+    this.el = parent;
+    this.el.classList.add("html");
+    if (typeof dom == "string") {
+      this.el.innerHTML = dom;
+    } else {
+      this.el.appendChild(dom);
+    }
+  }
+
+  remove() {
+    this.el.remove();
+  }
+
+};

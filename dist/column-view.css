@@ -67,3 +67,10 @@
   background-color: #0069D6;
 }
 
+.column-view .column > header {
+  line-height: 2em;
+  padding: 0 3px;
+  background: #F4F4F4;
+  color: #333;
+  border-bottom: 1px solid #E2E2E2;
+}
