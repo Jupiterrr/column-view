@@ -17,7 +17,7 @@ A Javascript column view component: without dependencies, with native feel
 <div id="column-view"></div>
 ```
 
-### JSON / PlainObject
+### JSON / PlainObject Notation
 
 ```javascript
 var data = {
@@ -40,12 +40,41 @@ var columnView = new ColumnView(
   {
     data: data
     onChange: function(item) {
-        console.log("Selection changed", item.additionalData);
+      console.log("Selection changed", item.additionalData);
     }
   }
 );
 ```
 
+### OO Array Notation
+
+```javascript
+var data = [
+  {
+    name: "Fruits", children: [
+      { name: "Banana", htm: "'<img src="banana.gif" />'" },
+      { name : "Apple", html: "🍎"}
+    ]
+  }],
+  {
+    name: "Cars", children: [
+      { name: "Invisible Car", html: "<h1>Aston Martin V12 Vanquish</h1>", additionalData: 5 },
+      { name: "Racing Car", html: "🏎"},
+      { name: "Police Car", html: "🚓"}
+    ]
+  }
+];
+
+var columnView = new ColumnView(
+  document.getElementById("column-view"),
+  {
+    data: data
+    onChange: function(item) {
+      console.log("Selection changed", item.additionalData);
+    }
+  }
+);
+```
 
 ### Custom Data Format
 
@@ -61,7 +90,7 @@ var data = {
 
 function getChildren(itemData) {
   return itemData.childIDs.map(function(id) {
-    const childItem = data[id];
+    var childItem = data[id];
     return { name: childItem.name, key: id, data: childItem };
   });
 }
@@ -87,7 +116,7 @@ var columnView = new ColumnView(
 
 ## Documentation
 
-### Types
+#### Types
 
 **Item** `[{name: <String>, key: <Any>, ...}]`
 
@@ -101,33 +130,85 @@ var columnView = new ColumnView(
 new ColumnView(
   <HTMLElement> container,
   {
-    source: <Function(<ItemData>, <CallbackFunction(<PlainObject>)>)>,
+    // use source or data
+    source: <Function(<Item>, <CallbackFunction(<PlainObject>)>)>,
     data: <PlainObject>
-    path: <Keys[]>,
-    onChange: <Function(<ItemData>)>
+
+    path: <Keys[]>, // optional
+    onChange: <Function(<Item>)> // optional
   }
 );
 ```
 
-**`container: <HTMLElement>`:**
+---
+
+##### `container: <HTMLElement>`:
 The HTML container, which is typically a DIV element, where the column-view will be created.
 
-**`source: <Function(<ItemData>, <CallbackFunction(<PlainObject>)>)>`:**
-This function provides the data for the componenten. So whenever the selection changes this function is called.
+---
+
+##### `source: <Function(<ItemData>, <CallbackFunction(<PlainObject>)>)>`:
+This function provides the data for the component. So whenever the selection changes data is needed this function is called. Its not called if the column-view moves back.
+
 
 CallbackFunction:
 * Normal List: `{items: <Item[]>}`
 * Grouped List: `{groups: [{title: <String>: items: <Item[]>}, ...]}`
 * Preview: `{html: <String>}`
 
-**`data: <PlainObject>`:**
+---
 
+##### `data: <PlainObject|Array>`:
+This entry set the data for the component. Use this as a static alternative to the dynamic `source` calls.
+By default two data formats are supported:
 
-**`path: <Keys[]>`:**
-Use an array of keys here if you want to preselect a certain route in the tree.
+###### PlainObject Notation
+```javascript
+{
+  "1": {
+    "1.1": "<b>HTML</b>",
+    "1.2": { _html: "..." }
+  },
+  "2": ...
+}
+```
 
-**`onChange: <Function(<Item>)>`:**
+###### OO Array Notation
+```javascript
+[
+  {
+    name: "1",
+    children: [
+      { name: "1.1", html: "<b>HTML</b>" },
+      ...
+    ]
+  },
+  { name: "2", children: ... },
+  ...
+]
+```
+
+---
+
+##### `path: <Keys[]> [optional]`:
+Use an array of keys here if you want to preselect items.
+(Works currently only when `source` is used)
+
+---
+
+##### `onChange: <Function(<Item>)> [optional]`:
 This function is called whenever the selection changes.
+
+---
+
+### #back()
+Removes the last column and last active selection.
+
+---
+
+### #canMoveBack()
+Returns a boolean whether a back move is possible.
+Useful in conjunction with onChange to show or hide back buttons.
 
 ## License
 
