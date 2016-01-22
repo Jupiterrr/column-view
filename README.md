@@ -16,7 +16,7 @@ A Javascript column view component: without dependencies, with native feel
 ```html
 <div id="column-view"></div>
 ```
-
+<!--
 ### JSON / PlainObject Notation
 
 ```javascript
@@ -75,20 +75,21 @@ var columnView = new ColumnView(
   }
 );
 ```
+-->
 
 ### Custom Data Format
 
 ```javascript
 var data = {
-  0: {name: "root", childIDs: [1,2]}, // not vissible
-  1: {name: "Item 1", childIDs: [3,4,5]},
-  2: {name: "Item 2"},
-  3: {name: "Item 3"},
-  4: {name: "Item 4"},
-  5: {name: "Item 5"}
+  0: { childIDs: [1,2] }, // root node
+  1: { name: "Item 1", childIDs: [3,4,5] },
+  2: { name: "Item 2" },
+  3: { name: "Item 1.1" },
+  4: { name: "Item 1.2" },
+  5: { name: "Item 1.3", additionalData: 5 }
 };
 
-function getChildren(itemData) {
+function getChildItems(itemData) {
   return itemData.childIDs.map(function(id) {
     var childItem = data[id];
     return { name: childItem.name, key: id, data: childItem };
@@ -101,14 +102,14 @@ var columnView = new ColumnView(
     source: function(item, cb) {
       var key = item.key;
       if (item.data.childIDs) {
-        cb({ items: getChildren(item.data) });
+        cb({ items: getChildItems(item.data) });
       } else {
         cb({ html: "Preview: " + selectedItem.name })
       }
     },
     path: [0, 1, 4],
     onChange: function(item) {
-      console.log("Selection changed", item);
+      console.log("Selection changed", item.data.additionalData);
     }
   }
 );
@@ -118,13 +119,13 @@ var columnView = new ColumnView(
 
 #### Types
 
-**Item** `[{name: <String>, key: <Any>, ...}]`
+**Item** `{ name: <String>, key: <Any>, ... }`
 
 **Key** A key is typically some sort of uniq id.
 
 ---
 
-### new ColumnView(...)
+#### new ColumnView(...)
 
 ```javascript
 new ColumnView(
@@ -140,25 +141,31 @@ new ColumnView(
 );
 ```
 
----
+<br>
 
 ##### `container: <HTMLElement>`:
 The HTML container, which is typically a DIV element, where the column-view will be created.
 
----
+<br>
 
 ##### `source: <Function(<ItemData>, <CallbackFunction(<PlainObject>)>)>`:
-This function provides the data for the component. So whenever the selection changes data is needed this function is called. Its not called if the column-view moves back.
-
+This function provides the data for the component. So whenever new data is
+required this function is called. This happens whenever the selection changes or
+a for every key that you passed via `path`.
+<!-- TODO ItemData key attribute -->
 
 CallbackFunction:
-* Normal List: `{items: <Item[]>}`
-* Grouped List: `{groups: [{title: <String>: items: <Item[]>}, ...]}`
-* Preview: `{html: <String>}`
+* Normal List: `{ items: <Item[]> }`
+* Grouped List: `{ groups: [{title: <String>: items: <Item[]>}, ...] }`
+* Preview: `{ html: <String> }`
 
----
+<br>
+
 
 ##### `data: <PlainObject|Array>`:
+*wip*
+
+<!--
 This entry set the data for the component. Use this as a static alternative to the dynamic `source` calls.
 By default two data formats are supported:
 
@@ -187,28 +194,34 @@ By default two data formats are supported:
   ...
 ]
 ```
+-->
 
----
+<br>
 
 ##### `path: <Keys[]> [optional]`:
 Use an array of keys here if you want to preselect items.
 (Works currently only when `source` is used)
 
----
+<br>
 
 ##### `onChange: <Function(<Item>)> [optional]`:
 This function is called whenever the selection changes.
 
 ---
 
-### #back()
+#### #back()
 Removes the last column and last active selection.
 
 ---
 
-### #canMoveBack()
+#### #canMoveBack()
 Returns a boolean whether a back move is possible.
 Useful in conjunction with onChange to show or hide back buttons.
+
+
+## Alternatives
+* [WebComponent for this component](https://github.com/Jupiterrr/column-view-component)
+* Some alternatives are listed in this StackExchange question: [Client-side, JavaScript-based Miller Columns](http://softwarerecs.stackexchange.com/questions/14074/client-side-javascript-based-miller-columns)
 
 ## License
 
