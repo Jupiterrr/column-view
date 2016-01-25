@@ -5,11 +5,10 @@ A Javascript column view component: without dependencies, with native feel
 * no dependencies
 * keyboard control
 * custom data format
-* mobile
 
-<a href="https://rawgithub.com/Jupiterrr/column-view/master/demo.html"><img src="https://cloud.githubusercontent.com/assets/681942/12482634/fceb3cf6-c050-11e5-841e-4cbbb24149f1.gif" alt="demo-video" width="650" height="329" /></a>
+<a href="http://jupiterrr.github.io/column-view/demo.html"><img src="https://cloud.githubusercontent.com/assets/681942/12482634/fceb3cf6-c050-11e5-841e-4cbbb24149f1.gif" alt="demo-video" width="650" height="329" /></a>
 
-### [Demo](https://rawgithub.com/Jupiterrr/column-view/master/demo.html)
+### [Demo](http://jupiterrr.github.io/column-view/demo.html)
 
 ## Examples
 
