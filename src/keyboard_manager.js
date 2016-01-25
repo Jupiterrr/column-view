@@ -1,6 +1,6 @@
 "use strict";
 
-class KeyboardManager {
+export default class KeyboardManager {
 
   constructor(columnView) {
     this.keyCodes = {

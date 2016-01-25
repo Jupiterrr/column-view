@@ -1,38 +1,10 @@
 "use strict";
+import KeyboardManager from './keyboard_manager.js';
+import debounce from './debounce.js';
+import CariageManager from './carriage_manager.js';
+import Promise from 'core-js/library/es6/promise.js';
 
-function debounce(func, wait, immediate) {
-  var timeout, args, context, timestamp, result;
-
-  function now() { new Date().getTime(); }
-
-  var later = () => {
-    var last = now() - timestamp;
-    if (last < wait) {
-      timeout = setTimeout(later, wait - last);
-    } else {
-      timeout = null;
-      if (!immediate) {
-        result = func.apply(context, args);
-        context = args = null;
-      }
-    }
-  };
-
-  return () => {
-    args = arguments;
-    timestamp = now();
-    const callNow = immediate && !timeout;
-    if (!timeout) timeout = setTimeout(later, wait);
-    if (callNow) {
-      result = func.apply(this, args);
-      context = args = null;
-    }
-
-    return result;
-  };
-}
-
-class ColumnView {
+export default class ColumnView {
 
   constructor(el, options) {
     this.options = options || {};

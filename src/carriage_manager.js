@@ -1,7 +1,9 @@
 "use strict";
+import CustomSelect from './custom-select.js';
+import { Preview } from './custom-select.js';
 
 // manges columns and the transition of the cariage
-class CariageManager {
+export default class CariageManager {
 
   constructor(columnView) {
     this.parent = columnView;
@@ -70,13 +72,13 @@ class CariageManager {
     if (col.customSelect) col.customSelect.clear();
     switch (true) {
       case 'dom' in data:
-        return new ColumnView.prototype.Preview(col, data.dom);
+        return new Preview(col, data.dom);
       case 'html' in data:
-        return new ColumnView.prototype.Preview(col, data.html);
+        return new Preview(col, data.html);
       case 'items' in data:
       case 'groups' in data:
         data.onChange = onChange;
-        return new ColumnView.prototype.CustomSelect(col, data, columnView);
+        return new CustomSelect(col, data, columnView);
       default:
         console.error("Type error", arguments);
         throw "Type error";

@@ -15,7 +15,7 @@ function htmlToDocumentFragment(html) {
 // aria-owns="catGroup" aria-expanded="false"
 // https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/ARIA_Techniques/Using_the_group_role
 
-ColumnView.prototype.CustomSelect = class CustomSelect {
+export default class CustomSelect {
 
   constructor(parent, data, columnView) {
     if (!data) data = {};
@@ -197,7 +197,7 @@ ColumnView.prototype.CustomSelect = class CustomSelect {
 
 };
 
-ColumnView.prototype.Preview = class Preview {
+export class Preview {
 
   constructor(parent, dom) {
     this.el = parent;
